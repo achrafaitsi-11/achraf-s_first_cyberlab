@@ -1,5 +1,6 @@
 import socket
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 common_ports = {
     21: "FTP",
@@ -17,6 +18,24 @@ common_ports = {
     3306: "MySQL",
     3389: "RDP"
 }
+
+def scan_port(port):
+
+    scanner = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    scanner.settimeout(0.1)
+
+    result = scanner.connect_ex((target_ip, port))
+
+    if result == 0:
+
+        open_ports.append(port)
+
+        service = common_ports.get(port, "Unknown Service")
+
+        print(f"[+] Port {port} ({service}) is OPEN")
+
+    scanner.close()
 
 # User inputs
 target = input("Enter the IP address or a domain : ")
@@ -48,24 +67,10 @@ start_time = time.time()
 
 open_ports = []
 
-for port in range(start_port, end_port + 1):
+with ThreadPoolExecutor(max_workers=100) as executor:
 
-    scanner = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    scanner.settimeout(0.1)
-
-    result = scanner.connect_ex((target_ip, port))
-
-    if result == 0:
-
-        open_ports.append(port)
-
-        service = common_ports.get(port, "Unknown Service")
-
-        print(f"[+] Port {port} ({service}) is OPEN")
-
-    scanner.close()
-
+    executor.map(scan_port, range(start_port, end_port + 1))
+    
 # End timer
 end_time = time.time()
 
