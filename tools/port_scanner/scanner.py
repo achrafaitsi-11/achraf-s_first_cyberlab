@@ -2,103 +2,104 @@ import socket
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-common_ports = {
-    21: "FTP",
-    22: "SSH",
-    23: "Telnet",
-    25: "SMTP",
-    53: "DNS",
-    80: "HTTP",
-    110: "POP3",
-    135: "RPC",
-    139: "NetBIOS",
-    143: "IMAP",
-    443: "HTTPS",
-    445: "SMB",
-    3306: "MySQL",
-    3389: "RDP"
-}
+from services import common_ports
+from report import save_report
 
-def scan_port(port):
 
-    scanner = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+def scan_port(target_ip, port):
 
-    scanner.settimeout(0.1)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as scanner:
 
-    result = scanner.connect_ex((target_ip, port))
+        scanner.settimeout(0.1)
+
+        result = scanner.connect_ex((target_ip, port))
 
     if result == 0:
-
-        open_ports.append(port)
 
         service = common_ports.get(port, "Unknown Service")
 
         print(f"[+] Port {port} ({service}) is OPEN")
 
-    scanner.close()
+        return port
 
-# User inputs
-target = input("Enter the IP address or a domain : ")
-try:
-    target_ip = socket.gethostbyname(target)
+    return None
 
-except socket.gaierror:
 
-    print("Invalid IP address or domain.")
+def main():
 
-    exit()
+    # User inputs
+    target = input("Enter the IP address or a domain : ")
 
-start_port = int(input("Enter the start port: "))
-end_port = int(input("Enter the end port: "))
+    try:
+        target_ip = socket.gethostbyname(target)
 
-# Input validation
-if start_port < 1 or end_port > 65535:
-    print("Ports must be between 1 and 65535.")
-    exit()
+    except socket.gaierror:
 
-if start_port > end_port:
-    print("Start port cannot be greater than end port.")
-    exit()
+        print("Invalid IP address or domain.")
+        return
 
-print(f"\nScanning {target} ({target_ip})...\n")
+    # Port range
+    start_port = int(input("Enter the start port: "))
+    end_port = int(input("Enter the end port: "))
 
-# Start timer
-start_time = time.time()
+    # Input validation
+    if start_port < 1 or end_port > 65535:
 
-open_ports = []
+        print("Ports must be between 1 and 65535.")
+        return
 
-with ThreadPoolExecutor(max_workers=100) as executor:
+    if start_port > end_port:
 
-    executor.map(scan_port, range(start_port, end_port + 1))
-    
-# End timer
-end_time = time.time()
+        print("Start port cannot be greater than end port.")
+        return
 
-# Final results
-if len(open_ports) == 0:
+    print(f"\nScanning {target} ({target_ip})...\n")
 
-    print("No open ports found.")
+    # Start timer
+    start_time = time.time()
 
-else:
+    open_ports = []
 
-    print(f"\nFound {len(open_ports)} open port(s).")
+    with ThreadPoolExecutor(max_workers=100) as executor:
 
-print(f"Scan completed in {end_time - start_time:.2f} seconds.")
+        results = executor.map(
+            scan_port,
+            [target_ip] * (end_port - start_port + 1),
+            range(start_port, end_port + 1)
+        )
 
-# Save results to a file
+        for result in results:
 
-filename = f"scan_results_{target}.txt"
+            if result is not None:
+                open_ports.append(result)
 
-with open(filename, "w") as file:
+    # End timer
+    end_time = time.time()
 
-    file.write(f"Target: {target}\n")
+    # Final results
+    if len(open_ports) == 0:
 
-    file.write(f"IP: {target_ip}\n\n")
+        print("No open ports found.")
 
-    for port in open_ports:
+    else:
 
-        service = common_ports.get(port, "Unknown Service")
+        print(f"\nFound {len(open_ports)} open port(s).")
 
-        file.write(f"Port {port} ({service})\n")
+    print(f"Scan completed in {end_time - start_time:.2f} seconds.")
 
-print(f"\nResults saved to {filename}")
+    # Save results
+    filename = f"scan_results_{target}.txt"
+
+    save_report(
+        filename,
+        target,
+        target_ip,
+        open_ports,
+        common_ports
+    )
+
+    print(f"\nResults saved to {filename}")
+
+
+if __name__ == "__main__":
+    main()
