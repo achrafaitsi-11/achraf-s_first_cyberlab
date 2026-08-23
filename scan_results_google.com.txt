@@ -1,5 +1,0 @@
-Target: google.com
-IP: 216.58.204.174
-
-Port 80 (HTTP)
-Port 443 (HTTPS)
